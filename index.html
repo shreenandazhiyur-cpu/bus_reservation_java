@@ -1,0 +1,1405 @@
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malabar SwiftBook — Bus Reservation & Ticketing System (v1.0)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+        .seat-btn {
+            transition: all 0.15s ease-in-out;
+        }
+        .seat-btn:not(:disabled):hover {
+            transform: translateY(-2px);
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printableTicketArea, #printableTicketArea * {
+                visibility: visible;
+            }
+            #printableTicketArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- Top Application Bar -->
+    <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            <!-- Brand Identity -->
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-500 flex items-center justify-center text-slate-950 font-bold shadow-sm">
+                    <i class="fa-solid fa-bus text-lg"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="font-bold text-base sm:text-lg tracking-tight text-white">Malabar SwiftBook</span>
+                        <span class="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-slate-800 text-teal-400 border border-slate-700">v1.0 Prototype</span>
+                    </div>
+                    <p class="text-xs text-slate-400 hidden sm:block">Intercity Seat Reservation & Fleet Ticketing Portal</p>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex flex-wrap items-center gap-1 bg-slate-800/90 p-1 rounded-xl border border-slate-700/70">
+                <button onclick="switchTab('bus')" id="nav-bus" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition bg-teal-500 text-slate-950 flex items-center gap-2">
+                    <i class="fa-solid fa-bus"></i>
+                    <span>Bus</span>
+                </button>
+                <button onclick="switchTab('passenger')" id="nav-passenger" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition flex items-center gap-2">
+                    <i class="fa-solid fa-id-card"></i>
+                    <span>Passenger</span>
+                </button>
+                <button onclick="switchTab('ticket')" id="nav-ticket" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition flex items-center gap-2">
+                    <i class="fa-solid fa-ticket"></i>
+                    <span>Ticket</span>
+                    <span id="activeTicketsBadge" class="px-1.5 py-0.2 rounded-full text-[11px] font-mono bg-teal-500/20 text-teal-300 border border-teal-500/30">2</span>
+                </button>
+                <button onclick="switchTab('fleet')" id="nav-fleet" class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition flex items-center gap-2">
+                    <i class="fa-solid fa-route"></i>
+                    <span>Fleet Manager</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Sub-bar Policy Notice -->
+    <div class="bg-white border-b border-slate-200 px-4 py-2 text-xs text-slate-600">
+        <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span><strong>Active Passenger:</strong> <span id="subbarActivePassenger" class="font-semibold text-slate-900">Arjun Nair (KL-ID-4829)</span></span>
+            </div>
+            <div class="flex items-center gap-1.5 text-slate-700 font-medium">
+                <i class="fa-regular fa-clock text-amber-600"></i>
+                <span>Cancellation Cutoff: <strong>2 hours prior to scheduled departure</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ==========================================
+             VIEW 1: BUS (SEARCH + SEAT MAP + BOOKING)
+             ========================================== -->
+        <section id="view-bus" class="space-y-6">
+
+            <!-- Route Search Filter Bar -->
+            <div class="bg-white rounded-2xl p-4 sm:p-5 shadow-sm border border-slate-200">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                            <i class="fa-solid fa-location-dot text-teal-600 mr-1"></i> From (Source)
+                        </label>
+                        <select id="filterSource" onchange="applyRouteFilter()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20">
+                            <option value="ALL">All Starting Points</option>
+                            <option value="Kozhikode">Kozhikode</option>
+                            <option value="Kochi">Kochi</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                            <i class="fa-solid fa-location-crosshairs text-indigo-600 mr-1"></i> To (Destination)
+                        </label>
+                        <select id="filterDestination" onchange="applyRouteFilter()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20">
+                            <option value="ALL">All Destinations</option>
+                            <option value="Kochi">Kochi</option>
+                            <option value="Thiruvananthapuram">Thiruvananthapuram</option>
+                            <option value="Bengaluru">Bengaluru</option>
+                            <option value="Munnar">Munnar</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                            <i class="fa-solid fa-sliders text-slate-500 mr-1"></i> Cabin Class Preference
+                        </label>
+                        <select id="filterSeatClass" onchange="setCabinHighlight(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20">
+                            <option value="ALL">Show All Classes (AC & Non-AC)</option>
+                            <option value="AC">AC Executive Class Only</option>
+                            <option value="NON_AC">Non-AC Standard Class Only</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button onclick="applyRouteFilter()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>Find Buses</span>
+                        </button>
+                        <button onclick="resetFilters()" title="Reset Search" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-3.5 rounded-xl text-sm transition border border-slate-300">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Workspace: Left Bus Selector (5 cols) | Right Seat Map & Booking Form (7 cols) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                <!-- Left Column: Matching Buses -->
+                <div class="lg:col-span-5 space-y-3">
+                    <div class="flex items-center justify-between px-1">
+                        <h2 class="text-xs font-bold uppercase tracking-wider text-slate-500">
+                            Available Coaches (<span id="matchingBusCount">4</span>)
+                        </h2>
+                        <span class="text-xs text-slate-500">Select a coach to view seats</span>
+                    </div>
+
+                    <div id="busSelectionList" class="space-y-3">
+                        <!-- Dynamically rendered Bus cards -->
+                    </div>
+                </div>
+
+                <!-- Right Column: Interactive Seat Allocation & Passenger Form -->
+                <div class="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200">
+                    <!-- Active Coach Banner -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 pb-4 mb-5 border-b border-slate-200">
+                        <div>
+                            <div class="flex items-center gap-2.5">
+                                <span id="headerBusCode" class="px-2.5 py-1 rounded-lg bg-slate-900 text-teal-400 font-mono text-xs font-bold">KL-11-A101</span>
+                                <h3 id="headerBusRoute" class="text-lg font-bold text-slate-900">Kozhikode → Kochi</h3>
+                            </div>
+                            <p id="headerBusTiming" class="text-xs text-slate-500 mt-1">Departs in 6h 00m • Cancellation open</p>
+                        </div>
+
+                        <!-- Legend Pills -->
+                        <div class="flex flex-wrap items-center gap-3 text-xs">
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3.5 h-3.5 rounded bg-sky-100 border-2 border-sky-500 inline-block"></span>
+                                <span class="text-slate-700 font-medium">AC (<span id="legendAcPrice" class="font-mono">₹450</span>)</span>
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3.5 h-3.5 rounded bg-emerald-100 border-2 border-emerald-500 inline-block"></span>
+                                <span class="text-slate-700 font-medium">Non-AC (<span id="legendNonAcPrice" class="font-mono">₹250</span>)</span>
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3.5 h-3.5 rounded bg-amber-500 border-2 border-amber-600 inline-block"></span>
+                                <span class="text-slate-700 font-medium">Selected</span>
+                            </span>
+                            <span class="flex items-center gap-1.5">
+                                <span class="w-3.5 h-3.5 rounded bg-slate-200 border border-slate-300 inline-block"></span>
+                                <span class="text-slate-400">Booked</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+
+                        <!-- 2x2 Bus Deck Layout (7 cols) -->
+                        <div class="md:col-span-7 bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                            <!-- Driver & Door Header -->
+                            <div class="flex items-center justify-between px-3 py-2 mb-3 rounded-xl bg-white border border-slate-200 text-xs text-slate-500">
+                                <span class="flex items-center gap-1.5 font-medium text-slate-600">
+                                    <i class="fa-solid fa-door-open text-teal-600"></i> Boarding Door
+                                </span>
+                                <span class="flex items-center gap-1.5 font-medium text-slate-600">
+                                    <i class="fa-solid fa-dharmachakra text-slate-700 text-sm"></i> Driver
+                                </span>
+                            </div>
+
+                            <!-- Seat Deck Container -->
+                            <div id="busSeatDeck" class="space-y-2">
+                                <!-- Rendered via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Passenger Details & Fare Summary (5 cols) -->
+                        <div class="md:col-span-5 space-y-4">
+                            <!-- Live Fare Calculation Box -->
+                            <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                                <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Selected Seat & Fare</div>
+
+                                <div id="emptySeatPrompt" class="text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
+                                    <i class="fa-solid fa-hand-pointer text-amber-600 mt-0.5"></i>
+                                    <span>Click an available <strong>AC</strong> or <strong>Non-AC</strong> seat on the layout to calculate fare.</span>
+                                </div>
+
+                                <div id="selectedSeatDetails" class="hidden space-y-2 text-xs">
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-slate-500">Seat Number:</span>
+                                        <span id="lblSeatNum" class="font-mono font-bold text-sm text-slate-900">#4</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-slate-500">Cabin Class:</span>
+                                        <span id="lblSeatClass" class="font-semibold px-2 py-0.5 rounded bg-sky-100 text-sky-800">AC Class</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-slate-500">Base Seat Fare:</span>
+                                        <span id="lblBaseFare" class="font-mono font-medium text-slate-800">₹450.00</span>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-slate-500">Ticket Insurance:</span>
+                                        <span id="lblInsuranceFee" class="font-mono font-medium text-teal-700">+₹0.00</span>
+                                    </div>
+                                    <div class="flex items-center justify-between pt-2 border-t border-slate-200">
+                                        <span class="font-semibold text-slate-700">Total Payable:</span>
+                                        <span id="lblSeatFare" class="font-mono font-extrabold text-base text-teal-700">₹450.00</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Passenger Form -->
+                            <form id="passengerBookingForm" onsubmit="submitSeatBooking(event)" class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Passenger Details</span>
+                                    <button type="button" onclick="fillFromActivePassenger()" class="text-[11px] font-semibold text-teal-600 hover:text-teal-700 flex items-center gap-1">
+                                        <i class="fa-solid fa-user-check"></i> Use My Profile
+                                    </button>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Passenger Full Name *</label>
+                                    <input type="text" id="inputPassengerName" required placeholder="e.g., Arjun Nair" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Passenger ID *</label>
+                                    <input type="text" id="inputPassengerId" required placeholder="e.g., KL-ID-4829" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:border-teal-600">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Contact Phone *</label>
+                                    <input type="tel" id="inputPassengerPhone" required placeholder="e.g., 9847123450" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:border-teal-600">
+                                </div>
+
+                                <!-- Optional Ticket Insurance Checkbox -->
+                                <label class="flex items-start gap-2.5 p-3 rounded-xl bg-teal-50/70 border border-teal-200 cursor-pointer">
+                                    <input type="checkbox" id="inputTicketInsurance" onchange="updateSelectedSeatBox()" class="mt-0.5 rounded text-teal-600 focus:ring-teal-500">
+                                    <span class="text-xs leading-snug">
+                                        <strong class="text-slate-800 block">Add Travel & Ticket Insurance (+₹35.00)</strong>
+                                        <span class="text-slate-500 text-[11px]">Covers baggage loss, transit delays & medical emergencies.</span>
+                                    </span>
+                                </label>
+
+                                <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm shadow-sm transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-check-circle"></i>
+                                    <span>Confirm Reservation</span>
+                                </button>
+                            </form>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 2: PASSENGER (PROFILE, ID, CONTACT & DIRECTORY)
+             ========================================== -->
+        <section id="view-passenger" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+                <!-- Left: Active Passenger Card & Profile Editor (5 cols) -->
+                <div class="lg:col-span-5 bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200 space-y-5">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+                        <div>
+                            <span class="text-[11px] font-mono uppercase tracking-wider text-teal-600 font-bold">Passenger Details</span>
+                            <h2 class="text-lg font-bold text-slate-900">My Passenger Profile</h2>
+                        </div>
+                        <div class="w-11 h-11 rounded-2xl bg-slate-900 text-teal-400 flex items-center justify-center text-lg font-bold">
+                            <i class="fa-solid fa-id-badge"></i>
+                        </div>
+                    </div>
+
+                    <!-- Digital Passenger ID Card Preview -->
+                    <div class="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 space-y-3 shadow-sm">
+                        <div class="flex items-center justify-between text-xs text-slate-400">
+                            <span class="font-mono uppercase tracking-wider text-teal-400">Verified Commuter Pass</span>
+                            <span id="cardPassengerId" class="font-mono font-bold text-white bg-slate-800 px-2.5 py-0.5 rounded border border-slate-700">KL-ID-4829</span>
+                        </div>
+                        <div>
+                            <div class="text-[11px] uppercase text-slate-400">Full Name</div>
+                            <div id="cardPassengerName" class="text-base font-bold text-white">Arjun Nair</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
+                            <div>
+                                <span class="text-[10px] uppercase text-slate-400 block">Contact Number</span>
+                                <span id="cardPassengerContact" class="font-mono text-slate-200">9847123450</span>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-[10px] uppercase text-slate-400 block">Active Tickets</span>
+                                <span id="cardPassengerTicketCount" class="font-mono font-bold text-teal-400">0 Booked</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Edit / Register Passenger Form -->
+                    <form onsubmit="savePassengerProfile(event)" class="space-y-3.5 pt-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Passenger Name *</label>
+                            <input type="text" id="profName" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm text-slate-900 focus:outline-none focus:border-teal-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Passenger ID (Gov ID / Student ID) *</label>
+                            <input type="text" id="profId" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:border-teal-600">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Contact Number *</label>
+                            <input type="tel" id="profContact" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-sm font-mono text-slate-900 focus:outline-none focus:border-teal-600">
+                        </div>
+
+                        <div class="flex items-center gap-2 pt-1">
+                            <button type="submit" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold py-2.5 px-4 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-floppy-disk"></i>
+                                <span>Save / Update Passenger</span>
+                            </button>
+                            <button type="button" onclick="prepareNewPassenger()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 px-3.5 rounded-xl text-xs sm:text-sm transition border border-slate-300">
+                                + New
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Right: Registered Passengers Directory & Associated Tickets (7 cols) -->
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200">
+                        <div class="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Registered Passengers Directory</h3>
+                                <p class="text-xs text-slate-500 mt-0.5">Select any passenger below to view their ID, contact details, or set them as the active commuter.</p>
+                            </div>
+                            <span id="totalPassengersCount" class="font-mono text-xs font-bold px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700">3 Passengers</span>
+                        </div>
+
+                        <div id="passengerDirectoryList" class="space-y-3">
+                            <!-- Dynamically populated -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 3: TICKET (CURRENT TICKETS, INSURANCE & 2H CUTOFF)
+             ========================================== -->
+        <section id="view-ticket" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-5 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Current Tickets, Insurance & Cancellations</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Manage issued tickets, toggle optional <strong>Ticket Insurance (+₹35)</strong>, or cancel reservations up to <strong>2 hours (120 mins)</strong> before departure.
+                        </p>
+                    </div>
+
+                    <!-- Search by Ticket ID -->
+                    <div class="flex items-center gap-2">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" id="ticketSearchInput" oninput="renderTicketsList()" placeholder="Search Ticket ID or Name..." class="bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs font-mono text-slate-800 focus:outline-none focus:border-teal-600">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tickets List Grid -->
+                <div id="issuedTicketsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==========================================
+             VIEW 4: FLEET MANAGER
+             ========================================== -->
+        <section id="view-fleet" class="hidden space-y-6">
+            <div class="bg-white rounded-2xl p-5 sm:p-6 shadow-sm border border-slate-200">
+                <div class="flex flex-wrap items-center justify-between gap-4 pb-5 mb-5 border-b border-slate-200">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Active Fleet & Route Schedule</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">Real-time seat inventory and class fare configuration across all buses.</p>
+                    </div>
+                    <button onclick="openNewBusModal()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition flex items-center gap-2">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>Add Bus to Schedule</span>
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-slate-500 uppercase text-xs">
+                                <th class="py-3 px-4">Bus Number</th>
+                                <th class="py-3 px-4">Route</th>
+                                <th class="py-3 px-4">Departure Window</th>
+                                <th class="py-3 px-4">AC Class (Fare / Avail)</th>
+                                <th class="py-3 px-4">Non-AC (Fare / Avail)</th>
+                                <th class="py-3 px-4 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fleetScheduleTableBody" class="divide-y divide-slate-200 text-slate-700">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ==========================================
+         MODAL 1: OFFICIAL BOARDING PASS / TICKET
+         ========================================== -->
+    <div id="boardingPassModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div id="printableTicketArea" class="p-6 space-y-4 bg-white">
+                <div class="flex items-center justify-between border-b border-dashed border-slate-300 pb-4">
+                    <div>
+                        <span class="text-[10px] font-mono uppercase tracking-widest text-teal-700 font-bold block">Malabar SwiftBook</span>
+                        <h3 class="text-base font-extrabold text-slate-900">PASSENGER E-TICKET</h3>
+                    </div>
+                    <span id="passTicketId" class="font-mono text-xs font-bold px-2.5 py-1 rounded bg-teal-50 text-teal-800 border border-teal-200">TKT-1001</span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
+                    <div>
+                        <span class="text-[10px] uppercase text-slate-400 block">Coach Number</span>
+                        <span id="passBusNumber" class="font-mono font-bold text-slate-900 text-sm">KL-11-A101</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] uppercase text-slate-400 block">Scheduled Departure</span>
+                        <span id="passDepartureTime" class="font-mono font-semibold text-slate-800">22:45 IST</span>
+                    </div>
+                    <div class="col-span-2 pt-2 border-t border-slate-200 flex items-center justify-between">
+                        <div>
+                            <span class="text-[10px] uppercase text-slate-400 block">From</span>
+                            <span id="passSource" class="font-bold text-sm text-slate-900">Kozhikode</span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right text-teal-600"></i>
+                        <div class="text-right">
+                            <span class="text-[10px] uppercase text-slate-400 block">To</span>
+                            <span id="passDestination" class="font-bold text-sm text-slate-900">Kochi</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
+                    <div class="col-span-2">
+                        <span class="text-[10px] uppercase text-slate-400 block">Passenger Details</span>
+                        <span id="passPassengerName" class="font-bold text-slate-900 text-sm block">Arjun Nair</span>
+                        <span id="passPassengerSub" class="font-mono text-[11px] text-slate-500">ID: KL-ID-4829 • 9847123450</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] uppercase text-slate-400 block">Seat & Class</span>
+                        <span id="passSeatInfo" class="font-mono font-bold text-sm text-slate-900 block">#4 (AC)</span>
+                        <span id="passFareAmount" class="font-mono font-extrabold text-sm text-teal-700">₹450.00</span>
+                        <span id="passInsuranceBadge" class="block text-[10px] font-mono text-emerald-700 font-semibold mt-0.5">Insured</span>
+                    </div>
+                </div>
+
+                <div class="pt-3 border-t border-dashed border-slate-300 flex items-center justify-between text-[11px] text-slate-500">
+                    <div>
+                        <div class="font-semibold text-slate-700">Cancellation Cutoff: 2 Hours Prior</div>
+                        <div id="passIssueTimestamp" class="font-mono text-[10px]">Issued: Today</div>
+                    </div>
+                    <!-- Barcode graphic -->
+                    <div class="flex items-center gap-0.5 h-7">
+                        <span class="w-1 h-full bg-slate-800"></span>
+                        <span class="w-0.5 h-full bg-slate-800"></span>
+                        <span class="w-1.5 h-full bg-slate-800"></span>
+                        <span class="w-0.5 h-full bg-slate-800"></span>
+                        <span class="w-1 h-full bg-slate-800"></span>
+                        <span class="w-2 h-full bg-slate-800"></span>
+                        <span class="w-0.5 h-full bg-slate-800"></span>
+                        <span class="w-1 h-full bg-slate-800"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 px-6 py-3.5 border-t border-slate-200 flex items-center justify-end gap-2">
+                <button onclick="window.print()" class="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-print"></i> Print Ticket
+                </button>
+                <button onclick="closeBoardingPassModal()" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         MODAL 2: ADD NEW BUS TO FLEET SCHEDULE
+         ========================================== -->
+    <div id="newBusModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                <h3 class="text-base font-bold text-slate-900">Add Coach to Fleet Schedule</h3>
+                <button onclick="closeNewBusModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleCreateBus(event)" class="space-y-3 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Bus Reg. Number *</label>
+                        <input type="text" id="addBusCode" required value="KL-11-D404" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono text-slate-900">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Departs In (Hours) *</label>
+                        <input type="number" id="addBusHours" required min="1" max="48" value="8" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono text-slate-900">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Source City *</label>
+                        <input type="text" id="addBusSource" required value="Kozhikode" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Destination City *</label>
+                        <input type="text" id="addBusDest" required value="Bengaluru" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-slate-900">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">AC Class Fare (₹) *</label>
+                        <input type="number" id="addBusAcFare" required value="950" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono text-slate-900">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1">Non-AC Fare (₹) *</label>
+                        <input type="number" id="addBusNonAcFare" required value="620" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-mono text-slate-900">
+                    </div>
+                </div>
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeNewBusModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-medium">Cancel</button>
+                    <button type="submit" class="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold">Save Coach</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="notificationArea" class="fixed bottom-5 right-5 z-50 space-y-2 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- ==========================================
+         CORE APPLICATION LOGIC
+         ========================================== -->
+    <script>
+        // Seat Class Constants
+        const SeatClass = Object.freeze({
+            AC: 'AC',
+            NON_AC: 'NON_AC'
+        });
+
+        // Passenger Class
+        class Passenger {
+            constructor(id, name, contact) {
+                this.passengerId = id;
+                this.name = name;
+                this.contact = contact;
+            }
+        }
+
+        // Bus Class
+        class Bus {
+            constructor(busNumber, source, destination, departureTime, acSeatCount, nonAcSeatCount, acFare, nonAcFare) {
+                this.busNumber = busNumber;
+                this.source = source;
+                this.destination = destination;
+                this.departureTime = departureTime;
+                this.acSeatCount = acSeatCount;
+                this.nonAcSeatCount = nonAcSeatCount;
+                this.totalSeats = acSeatCount + nonAcSeatCount;
+                this.seatClasses = new Map();
+                this.availableSeats = new Map();
+                this.fares = {
+                    [SeatClass.AC]: acFare,
+                    [SeatClass.NON_AC]: nonAcFare
+                };
+
+                let seatNo = 1;
+                for (let i = 0; i < acSeatCount; i++) {
+                    this.seatClasses.set(seatNo, SeatClass.AC);
+                    this.availableSeats.set(seatNo, SeatClass.AC);
+                    seatNo++;
+                }
+                for (let i = 0; i < nonAcSeatCount; i++) {
+                    this.seatClasses.set(seatNo, SeatClass.NON_AC);
+                    this.availableSeats.set(seatNo, SeatClass.NON_AC);
+                    seatNo++;
+                }
+            }
+
+            getFare(seatClass) {
+                return this.fares[seatClass] || 0;
+            }
+
+            getAvailableByClass(seatClass) {
+                const list = [];
+                for (const [sNo, sClass] of this.availableSeats.entries()) {
+                    if (sClass === seatClass) list.push(sNo);
+                }
+                return list;
+            }
+
+            isSeatAvailable(seatNumber) {
+                return this.availableSeats.has(seatNumber);
+            }
+
+            allocateSeat(seatNumber) {
+                if (this.availableSeats.has(seatNumber)) {
+                    this.availableSeats.delete(seatNumber);
+                    return true;
+                }
+                return false;
+            }
+
+            releaseSeat(seatNumber) {
+                const origClass = this.seatClasses.get(seatNumber);
+                if (origClass) {
+                    this.availableSeats.set(seatNumber, origClass);
+                }
+            }
+        }
+
+        // Ticket Class (Includes Bus, Seat Number, Seat Class, Fare, Passenger Details, and Ticket Insurance)
+        class Ticket {
+            constructor(ticketId, bus, passenger, seatNumber, seatClass, baseFare, insured = false) {
+                this.ticketId = ticketId;
+                this.bus = bus;
+                this.passenger = passenger;
+                this.seatNumber = seatNumber;
+                this.seatClass = seatClass;
+                this.baseFare = baseFare;
+                this.insured = insured;
+                this.insuranceFee = insured ? 35 : 0;
+                this.fare = baseFare + this.insuranceFee;
+                this.bookingTime = new Date();
+            }
+
+            addInsurance() {
+                if (!this.insured) {
+                    this.insured = true;
+                    this.insuranceFee = 35;
+                    this.fare = this.baseFare + this.insuranceFee;
+                }
+            }
+        }
+
+        // FleetManager Controller Class
+        class FleetManager {
+            constructor() {
+                this.buses = [];
+                this.tickets = new Map();
+                this.passengers = new Map();
+                this.ticketSeq = 1000;
+                this.CUTOFF_HOURS = 2;
+            }
+
+            addBus(bus) {
+                this.buses.push(bus);
+            }
+
+            registerPassenger(passenger) {
+                this.passengers.set(passenger.passengerId.toUpperCase(), passenger);
+                return passenger;
+            }
+
+            findBus(busNumber) {
+                return this.buses.find(b => b.busNumber.toUpperCase() === busNumber.toUpperCase()) || null;
+            }
+
+            searchBuses(source, destination) {
+                return this.buses.filter(b => {
+                    const srcMatch = (source === 'ALL' || b.source.toLowerCase() === source.toLowerCase());
+                    const dstMatch = (destination === 'ALL' || b.destination.toLowerCase() === destination.toLowerCase());
+                    return srcMatch && dstMatch;
+                });
+            }
+
+            bookSeat(busNumber, passenger, seatNumber, insured = false) {
+                const bus = this.findBus(busNumber);
+                if (!bus || !bus.isSeatAvailable(seatNumber)) return null;
+
+                this.registerPassenger(passenger);
+                const seatClass = bus.seatClasses.get(seatNumber);
+                const baseFare = bus.getFare(seatClass);
+                bus.allocateSeat(seatNumber);
+
+                const ticketId = `TKT-${++this.ticketSeq}`;
+                const ticket = new Ticket(ticketId, bus, passenger, seatNumber, seatClass, baseFare, insured);
+                this.tickets.set(ticketId, ticket);
+                return ticket;
+            }
+
+            cancelTicket(ticketId) {
+                const ticket = this.tickets.get(ticketId.toUpperCase());
+                if (!ticket) {
+                    return { ok: false, message: 'Ticket ID not found.' };
+                }
+
+                const minsRemaining = Math.floor((ticket.bus.departureTime - new Date()) / 60000);
+                if (minsRemaining < this.CUTOFF_HOURS * 60) {
+                    return {
+                        ok: false,
+                        cutoffLocked: true,
+                        minsRemaining,
+                        message: `Cancellation Disallowed: Coach ${ticket.bus.busNumber} departs in ${minsRemaining} minutes, which is within the mandatory 2-hour cutoff window.`
+                    };
+                }
+
+                ticket.bus.releaseSeat(ticket.seatNumber);
+                this.tickets.delete(ticket.ticketId);
+                return {
+                    ok: true,
+                    ticket,
+                    message: `Booking ${ticket.ticketId} cancelled. Seat #${ticket.seatNumber} (${ticket.seatClass === 'AC' ? 'AC' : 'Non-AC'}) is now available and ₹${ticket.fare.toFixed(2)} has been queued for refund.`
+                };
+            }
+        }
+
+        // Application Instance & UI State
+        const fleetManager = new FleetManager();
+        let activeBusNumber = 'KL-11-A101';
+        let currentSelectedSeat = null;
+        let cabinHighlight = 'ALL';
+        let activePassenger = new Passenger('KL-ID-4829', 'Arjun Nair', '9847123450');
+
+        function initializeSampleData() {
+            const now = new Date();
+
+            // 1. Kozhikode -> Kochi (6 hours out)
+            fleetManager.addBus(new Bus(
+                'KL-11-A101', 'Kozhikode', 'Kochi',
+                new Date(now.getTime() + 6 * 3600000),
+                8, 12, 450, 250
+            ));
+
+            // 2. Kozhikode -> Thiruvananthapuram (12 hours out)
+            fleetManager.addBus(new Bus(
+                'KL-11-B202', 'Kozhikode', 'Thiruvananthapuram',
+                new Date(now.getTime() + 12 * 3600000),
+                8, 12, 850, 500
+            ));
+
+            // 3. Kozhikode -> Kochi Express (1 hour 15 mins out -> Inside 2-Hour Cutoff)
+            fleetManager.addBus(new Bus(
+                'KL-11-EX99', 'Kozhikode', 'Kochi',
+                new Date(now.getTime() + 75 * 60000),
+                8, 12, 500, 300
+            ));
+
+            // 4. Kochi -> Munnar (9 hours out)
+            fleetManager.addBus(new Bus(
+                'KL-07-M305', 'Kochi', 'Munnar',
+                new Date(now.getTime() + 9 * 3600000),
+                8, 12, 420, 240
+            ));
+
+            // Register default active passenger & sample bookings
+            fleetManager.registerPassenger(activePassenger);
+            fleetManager.bookSeat('KL-11-A101', new Passenger('KL-ID-3091', 'Meera Krishnan', '9447123456'), 3, true);
+            fleetManager.bookSeat('KL-11-EX99', new Passenger('KL-ID-7742', 'Rahul Menon', '9895112233'), 2, false);
+
+            fillFromActivePassenger();
+        }
+
+        function getRemainingTimeParts(depDate) {
+            const totalMins = Math.max(0, Math.floor((depDate - new Date()) / 60000));
+            const hrs = Math.floor(totalMins / 60);
+            const mins = totalMins % 60;
+            return { hrs, mins, totalMins };
+        }
+
+        function refreshUI() {
+            renderBusList();
+            renderBusDeck();
+            renderPassengerView();
+            renderTicketsList();
+            renderFleetTable();
+            document.getElementById('activeTicketsBadge').textContent = fleetManager.tickets.size;
+            document.getElementById('subbarActivePassenger').textContent = `${activePassenger.name} (${activePassenger.passengerId})`;
+        }
+
+        function fillFromActivePassenger() {
+            const nameEl = document.getElementById('inputPassengerName');
+            const idEl = document.getElementById('inputPassengerId');
+            const phoneEl = document.getElementById('inputPassengerPhone');
+            if (nameEl && idEl && phoneEl && activePassenger) {
+                nameEl.value = activePassenger.name;
+                idEl.value = activePassenger.passengerId;
+                phoneEl.value = activePassenger.contact;
+            }
+        }
+
+        function renderPassengerView() {
+            // Update active card & form
+            document.getElementById('cardPassengerId').textContent = activePassenger.passengerId;
+            document.getElementById('cardPassengerName').textContent = activePassenger.name;
+            document.getElementById('cardPassengerContact').textContent = activePassenger.contact;
+
+            const activeTicketsForUser = Array.from(fleetManager.tickets.values()).filter(
+                t => t.passenger.passengerId.toUpperCase() === activePassenger.passengerId.toUpperCase()
+            );
+            document.getElementById('cardPassengerTicketCount').textContent = `${activeTicketsForUser.length} Booked`;
+
+            document.getElementById('profName').value = activePassenger.name;
+            document.getElementById('profId').value = activePassenger.passengerId;
+            document.getElementById('profContact').value = activePassenger.contact;
+
+            const allPassengers = Array.from(fleetManager.passengers.values());
+            document.getElementById('totalPassengersCount').textContent = `${allPassengers.length} Passengers`;
+
+            const listEl = document.getElementById('passengerDirectoryList');
+            listEl.innerHTML = allPassengers.map(p => {
+                const isCurrent = p.passengerId.toUpperCase() === activePassenger.passengerId.toUpperCase();
+                const userTickets = Array.from(fleetManager.tickets.values()).filter(
+                    t => t.passenger.passengerId.toUpperCase() === p.passengerId.toUpperCase()
+                );
+
+                return `
+                    <div class="p-4 rounded-2xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isCurrent ? 'bg-teal-50/60 border-teal-500' : 'bg-slate-50 border-slate-200'}">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-sm text-slate-900">${p.name}</span>
+                                <span class="font-mono text-xs px-2 py-0.5 rounded bg-slate-900 text-teal-400 font-semibold">ID: ${p.passengerId}</span>
+                                ${isCurrent ? '<span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-teal-600 text-white">Active Profile</span>' : ''}
+                            </div>
+                            <div class="text-xs text-slate-600 flex flex-wrap items-center gap-3">
+                                <span><i class="fa-solid fa-phone text-slate-400 mr-1"></i> <span class="font-mono">${p.contact}</span></span>
+                                <span><i class="fa-solid fa-ticket text-slate-400 mr-1"></i> ${userTickets.length} active ticket(s)</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="selectActivePassenger('${p.passengerId}')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition ${isCurrent ? 'bg-slate-200 text-slate-700' : 'bg-slate-900 hover:bg-slate-800 text-white'}">
+                                ${isCurrent ? 'Selected' : 'Switch Profile'}
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectActivePassenger(passengerId) {
+            const found = fleetManager.passengers.get(passengerId.toUpperCase());
+            if (found) {
+                activePassenger = found;
+                fillFromActivePassenger();
+                refreshUI();
+                notifyUser(`Active passenger switched to ${found.name} (${found.passengerId}).`, 'info');
+            }
+        }
+
+        function savePassengerProfile(e) {
+            e.preventDefault();
+            const name = document.getElementById('profName').value.trim();
+            const id = document.getElementById('profId').value.trim();
+            const contact = document.getElementById('profContact').value.trim();
+
+            const updated = new Passenger(id, name, contact);
+            fleetManager.registerPassenger(updated);
+            activePassenger = updated;
+
+            // Also update passenger details on any existing active tickets matching this ID
+            for (const t of fleetManager.tickets.values()) {
+                if (t.passenger.passengerId.toUpperCase() === id.toUpperCase()) {
+                    t.passenger = updated;
+                }
+            }
+
+            fillFromActivePassenger();
+            refreshUI();
+            notifyUser(`Passenger profile saved for ${name} (ID: ${id}).`, 'success');
+        }
+
+        function prepareNewPassenger() {
+            document.getElementById('profName').value = '';
+            document.getElementById('profId').value = `KL-ID-${Math.floor(1000 + Math.random() * 9000)}`;
+            document.getElementById('profContact').value = '';
+            document.getElementById('profName').focus();
+        }
+
+        function renderBusList() {
+            const src = document.getElementById('filterSource').value;
+            const dst = document.getElementById('filterDestination').value;
+            const list = fleetManager.searchBuses(src, dst);
+            document.getElementById('matchingBusCount').textContent = list.length;
+
+            const container = document.getElementById('busSelectionList');
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-2xl p-6 text-center border border-slate-200">
+                        <p class="text-sm font-semibold text-slate-700">No buses match this route.</p>
+                        <button onclick="resetFilters()" class="mt-2 text-xs text-teal-600 font-semibold hover:underline">Reset route filters</button>
+                    </div>
+                `;
+                return;
+            }
+
+            // Ensure an active bus is selected
+            if (!list.some(b => b.busNumber === activeBusNumber)) {
+                activeBusNumber = list[0].busNumber;
+                currentSelectedSeat = null;
+            }
+
+            container.innerHTML = list.map(bus => {
+                const selected = bus.busNumber === activeBusNumber;
+                const acLeft = bus.getAvailableByClass(SeatClass.AC).length;
+                const nonAcLeft = bus.getAvailableByClass(SeatClass.NON_AC).length;
+                const t = getRemainingTimeParts(bus.departureTime);
+                const cutoffSoon = t.totalMins < 120;
+
+                return `
+                    <div onclick="selectBusCard('${bus.busNumber}')" class="cursor-pointer rounded-2xl p-4 transition border ${selected ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white hover:border-teal-500 border-slate-200'}">
+                        <div class="flex items-center justify-between gap-2 mb-2">
+                            <span class="font-mono text-xs font-bold px-2 py-0.5 rounded ${selected ? 'bg-teal-500 text-slate-950' : 'bg-slate-100 text-slate-800'}">
+                                ${bus.busNumber}
+                            </span>
+                            <span class="text-[11px] font-medium px-2 py-0.5 rounded ${cutoffSoon ? 'bg-amber-500/20 text-amber-600 border border-amber-500/30' : (selected ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600')}">
+                                Departs in ${t.hrs > 0 ? t.hrs + 'h ' : ''}${t.mins}m
+                            </span>
+                        </div>
+
+                        <div class="text-base font-bold ${selected ? 'text-white' : 'text-slate-900'}">
+                            ${bus.source} <i class="fa-solid fa-arrow-right text-xs opacity-60 mx-1"></i> ${bus.destination}
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 mt-3 pt-2.5 border-t ${selected ? 'border-slate-800' : 'border-slate-100'} text-xs">
+                            <div class="flex items-center justify-between">
+                                <span class="${selected ? 'text-sky-300' : 'text-sky-700'} font-medium">AC: ₹${bus.getFare(SeatClass.AC)}</span>
+                                <span class="font-mono ${selected ? 'text-slate-400' : 'text-slate-500'}">${acLeft} left</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="${selected ? 'text-emerald-300' : 'text-emerald-700'} font-medium">Non-AC: ₹${bus.getFare(SeatClass.NON_AC)}</span>
+                                <span class="font-mono ${selected ? 'text-slate-400' : 'text-slate-500'}">${nonAcLeft} left</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectBusCard(busNumber) {
+            activeBusNumber = busNumber;
+            currentSelectedSeat = null;
+            updateSelectedSeatBox();
+            renderBusList();
+            renderBusDeck();
+        }
+
+        function setCabinHighlight(val) {
+            cabinHighlight = val;
+            renderBusDeck();
+        }
+
+        function renderBusDeck() {
+            const bus = fleetManager.findBus(activeBusNumber);
+            if (!bus) return;
+
+            const t = getRemainingTimeParts(bus.departureTime);
+            const cutoffLocked = t.totalMins < 120;
+
+            document.getElementById('headerBusCode').textContent = bus.busNumber;
+            document.getElementById('headerBusRoute').textContent = `${bus.source} → ${bus.destination}`;
+            document.getElementById('headerBusTiming').innerHTML = cutoffLocked
+                ? `<span class="text-amber-600 font-medium"><i class="fa-solid fa-clock mr-1"></i>Departs in ${t.hrs}h ${t.mins}m • Within 2-hour cutoff window (non-cancellable)</span>`
+                : `Departs in ${t.hrs}h ${t.mins}m • Standard cancellation policy applies`;
+
+            document.getElementById('legendAcPrice').textContent = `₹${bus.getFare(SeatClass.AC)}`;
+            document.getElementById('legendNonAcPrice').textContent = `₹${bus.getFare(SeatClass.NON_AC)}`;
+
+            const rows = [];
+            for (let s = 1; s <= bus.totalSeats; s += 4) {
+                rows.push([s, s + 1, s + 2, s + 3].filter(n => n <= bus.totalSeats));
+            }
+
+            let html = '';
+            rows.forEach((rowSeats, idx) => {
+                const rowClass = bus.seatClasses.get(rowSeats[0]);
+                const prevRowClass = idx > 0 ? bus.seatClasses.get(rows[idx - 1][0]) : null;
+
+                // Section Header Divider between AC and Non-AC
+                if (idx === 0 || rowClass !== prevRowClass) {
+                    const label = rowClass === SeatClass.AC
+                        ? `AC Executive Cabin (₹${bus.getFare(SeatClass.AC)})`
+                        : `Non-AC Standard Coach (₹${bus.getFare(SeatClass.NON_AC)})`;
+                    html += `
+                        <div class="pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                            <span>${label}</span>
+                            <span>2x2 Layout</span>
+                        </div>
+                    `;
+                }
+
+                const dimmed = (cabinHighlight !== 'ALL' && cabinHighlight !== rowClass);
+
+                const renderSeatBtn = (seatNo) => {
+                    if (!seatNo) return `<div class="w-11 h-10"></div>`;
+                    const sClass = bus.seatClasses.get(seatNo);
+                    const available = bus.isSeatAvailable(seatNo);
+                    const isSelected = currentSelectedSeat === seatNo;
+
+                    let btnStyle = '';
+                    if (!available) {
+                        btnStyle = 'bg-slate-200 border-slate-300 text-slate-400 cursor-not-allowed';
+                    } else if (isSelected) {
+                        btnStyle = 'bg-amber-500 border-amber-600 text-white font-bold shadow-sm ring-2 ring-amber-300';
+                    } else if (sClass === SeatClass.AC) {
+                        btnStyle = 'bg-sky-50 hover:bg-sky-100 border-sky-400 text-sky-900 font-semibold';
+                    } else {
+                        btnStyle = 'bg-emerald-50 hover:bg-emerald-100 border-emerald-400 text-emerald-900 font-semibold';
+                    }
+
+                    return `
+                        <button type="button"
+                            ${!available ? 'disabled' : ''}
+                            onclick="toggleSeatSelection(${seatNo})"
+                            class="seat-btn w-11 h-10 rounded-xl border-2 text-xs font-mono flex flex-col items-center justify-center ${btnStyle} ${dimmed ? 'opacity-25' : ''}">
+                            <span>${seatNo}</span>
+                            <span class="text-[8px] uppercase">${!available ? 'BKD' : (sClass === 'AC' ? 'AC' : 'NAC')}</span>
+                        </button>
+                    `;
+                };
+
+                html += `
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            ${renderSeatBtn(rowSeats[0])}
+                            ${renderSeatBtn(rowSeats[1])}
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-300">R${idx + 1}</span>
+                        <div class="flex items-center gap-2">
+                            ${renderSeatBtn(rowSeats[2])}
+                            ${renderSeatBtn(rowSeats[3])}
+                        </div>
+                    </div>
+                `;
+            });
+
+            document.getElementById('busSeatDeck').innerHTML = html;
+        }
+
+        function toggleSeatSelection(seatNo) {
+            const bus = fleetManager.findBus(activeBusNumber);
+            if (!bus || !bus.isSeatAvailable(seatNo)) return;
+
+            currentSelectedSeat = (currentSelectedSeat === seatNo) ? null : seatNo;
+            updateSelectedSeatBox();
+            renderBusDeck();
+        }
+
+        function updateSelectedSeatBox() {
+            const bus = fleetManager.findBus(activeBusNumber);
+            const promptEl = document.getElementById('emptySeatPrompt');
+            const detailsEl = document.getElementById('selectedSeatDetails');
+            const insCheck = document.getElementById('inputTicketInsurance');
+
+            if (!bus || !currentSelectedSeat) {
+                promptEl.classList.remove('hidden');
+                detailsEl.classList.add('hidden');
+                return;
+            }
+
+            const sClass = bus.seatClasses.get(currentSelectedSeat);
+            const baseFare = bus.getFare(sClass);
+            const insFee = (insCheck && insCheck.checked) ? 35 : 0;
+            const totalFare = baseFare + insFee;
+
+            promptEl.classList.add('hidden');
+            detailsEl.classList.remove('hidden');
+            document.getElementById('lblSeatNum').textContent = `Seat #${currentSelectedSeat}`;
+            document.getElementById('lblSeatClass').textContent = sClass === SeatClass.AC ? 'AC Executive' : 'Non-AC Standard';
+            document.getElementById('lblSeatClass').className = sClass === SeatClass.AC
+                ? 'font-semibold px-2 py-0.5 rounded bg-sky-100 text-sky-800'
+                : 'font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800';
+            document.getElementById('lblBaseFare').textContent = `₹${baseFare.toFixed(2)}`;
+            document.getElementById('lblInsuranceFee').textContent = insFee > 0 ? `+₹${insFee.toFixed(2)} (Insured)` : '₹0.00 (None)';
+            document.getElementById('lblSeatFare').textContent = `₹${totalFare.toFixed(2)}`;
+        }
+
+        function submitSeatBooking(e) {
+            e.preventDefault();
+            if (!currentSelectedSeat) {
+                notifyUser('Please select a seat on the coach layout before confirming.', 'warning');
+                return;
+            }
+
+            const name = document.getElementById('inputPassengerName').value.trim();
+            const id = document.getElementById('inputPassengerId').value.trim();
+            const phone = document.getElementById('inputPassengerPhone').value.trim();
+            const insured = document.getElementById('inputTicketInsurance').checked;
+
+            const passenger = new Passenger(id, name, phone);
+            activePassenger = passenger;
+            const ticket = fleetManager.bookSeat(activeBusNumber, passenger, currentSelectedSeat, insured);
+
+            if (ticket) {
+                currentSelectedSeat = null;
+                document.getElementById('inputTicketInsurance').checked = false;
+                updateSelectedSeatBox();
+                fillFromActivePassenger();
+                refreshUI();
+                notifyUser(`Ticket ${ticket.ticketId} confirmed for ${passenger.name}${insured ? ' with Ticket Insurance' : ''}.`, 'success');
+                showBoardingPass(ticket.ticketId);
+            }
+        }
+
+        function renderTicketsList() {
+            const query = (document.getElementById('ticketSearchInput')?.value || '').trim().toUpperCase();
+            const allTickets = Array.from(fleetManager.tickets.values()).reverse();
+            const filtered = query ? allTickets.filter(t => t.ticketId.includes(query) || t.passenger.name.toUpperCase().includes(query)) : allTickets;
+
+            const container = document.getElementById('issuedTicketsContainer');
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-2 text-center py-10 text-slate-400">
+                        <p class="text-sm">No active tickets found.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(t => {
+                const rem = getRemainingTimeParts(t.bus.departureTime);
+                const lockedByCutoff = rem.totalMins < 120;
+
+                return `
+                    <div class="rounded-2xl p-5 border ${lockedByCutoff ? 'bg-amber-50/40 border-amber-200' : 'bg-slate-50 border-slate-200'} flex flex-col justify-between space-y-4">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-mono text-xs font-bold px-2.5 py-0.5 rounded bg-slate-900 text-teal-400">${t.ticketId}</span>
+                                    <span class="font-mono text-xs text-slate-500">${t.bus.busNumber}</span>
+                                    ${t.insured
+                                        ? `<span class="text-[11px] font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200"><i class="fa-solid fa-shield-heart mr-1"></i>Insured (+₹35)</span>`
+                                        : `<span class="text-[11px] font-medium px-2 py-0.5 rounded bg-slate-200 text-slate-600">Uninsured</span>`
+                                    }
+                                </div>
+                                <h4 class="text-base font-bold text-slate-900 mt-1.5">${t.bus.source} → ${t.bus.destination}</h4>
+                                <p class="text-xs text-slate-600 mt-0.5">
+                                    Passenger: <strong>${t.passenger.name}</strong> (ID: <span class="font-mono">${t.passenger.passengerId}</span> • <span class="font-mono">${t.passenger.contact}</span>)
+                                </p>
+                            </div>
+                            <div class="text-right font-mono">
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded ${t.seatClass === 'AC' ? 'bg-sky-100 text-sky-800' : 'bg-emerald-100 text-emerald-800'}">
+                                    Seat #${t.seatNumber} (${t.seatClass === 'AC' ? 'AC' : 'Non-AC'})
+                                </span>
+                                <div class="text-base font-extrabold text-slate-900 mt-1">₹${t.fare.toFixed(2)}</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl p-3 border border-slate-200 flex items-center justify-between text-xs">
+                            <span class="text-slate-500">Cancellation Cutoff (2h Rule):</span>
+                            <span class="font-mono font-semibold ${lockedByCutoff ? 'text-amber-700' : 'text-emerald-700'}">
+                                Departs in ${rem.hrs}h ${rem.mins}m ${lockedByCutoff ? '• Locked (<2h)' : '• Eligible'}
+                            </span>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-end gap-2">
+                            ${!t.insured ? `
+                                <button onclick="handleAddInsurance('${t.ticketId}')" class="px-3 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 text-xs font-semibold transition flex items-center gap-1.5">
+                                    <i class="fa-solid fa-shield-halved"></i> Add Insurance (+₹35)
+                                </button>
+                            ` : ''}
+                            <button onclick="showBoardingPass('${t.ticketId}')" class="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-xs font-semibold transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-ticket"></i> Boarding Pass
+                            </button>
+                            <button onclick="handleCancelTicket('${t.ticketId}')" class="px-3.5 py-2 rounded-xl ${lockedByCutoff ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300' : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'} text-xs font-semibold transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-ban"></i> Cancel Ticket
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleAddInsurance(ticketId) {
+            const ticket = fleetManager.tickets.get(ticketId);
+            if (ticket && !ticket.insured) {
+                ticket.addInsurance();
+                refreshUI();
+                notifyUser(`Ticket Insurance (+₹35.00) added to ${ticket.ticketId}. Updated fare: ₹${ticket.fare.toFixed(2)}.`, 'success');
+            }
+        }
+
+        function handleCancelTicket(ticketId) {
+            const res = fleetManager.cancelTicket(ticketId);
+            if (!res.ok) {
+                notifyUser(res.message, res.cutoffLocked ? 'warning' : 'error');
+            } else {
+                notifyUser(res.message, 'success');
+            }
+            refreshUI();
+        }
+
+        function renderFleetTable() {
+            const tbody = document.getElementById('fleetScheduleTableBody');
+            tbody.innerHTML = fleetManager.buses.map(b => {
+                const rem = getRemainingTimeParts(b.departureTime);
+                const acAvail = b.getAvailableByClass(SeatClass.AC).length;
+                const nonAcAvail = b.getAvailableByClass(SeatClass.NON_AC).length;
+
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="py-3.5 px-4 font-mono font-bold text-slate-900">${b.busNumber}</td>
+                        <td class="py-3.5 px-4 font-semibold text-slate-800">${b.source} → ${b.destination}</td>
+                        <td class="py-3.5 px-4 font-mono text-xs text-slate-600">In ${rem.hrs}h ${rem.mins}m</td>
+                        <td class="py-3.5 px-4 font-mono text-xs">
+                            <span class="font-bold text-sky-700">₹${b.getFare(SeatClass.AC)}</span>
+                            <span class="text-slate-500">(${acAvail}/${b.acSeatCount} avail)</span>
+                        </td>
+                        <td class="py-3.5 px-4 font-mono text-xs">
+                            <span class="font-bold text-emerald-700">₹${b.getFare(SeatClass.NON_AC)}</span>
+                            <span class="text-slate-500">(${nonAcAvail}/${b.nonAcSeatCount} avail)</span>
+                        </td>
+                        <td class="py-3.5 px-4 text-right">
+                            <button onclick="jumpToBusBooking('${b.busNumber}')" class="text-xs font-semibold text-teal-700 hover:underline">
+                                Select Coach →
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function jumpToBusBooking(busNumber) {
+            activeBusNumber = busNumber;
+            resetFilters();
+            switchTab('bus');
+        }
+
+        function showBoardingPass(ticketId) {
+            const t = fleetManager.tickets.get(ticketId);
+            if (!t) return;
+
+            document.getElementById('passTicketId').textContent = t.ticketId;
+            document.getElementById('passBusNumber').textContent = t.bus.busNumber;
+            document.getElementById('passDepartureTime').textContent = t.bus.departureTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            document.getElementById('passSource').textContent = t.bus.source;
+            document.getElementById('passDestination').textContent = t.bus.destination;
+            document.getElementById('passPassengerName').textContent = t.passenger.name;
+            document.getElementById('passPassengerSub').textContent = `ID: ${t.passenger.passengerId} • ${t.passenger.contact}`;
+            document.getElementById('passSeatInfo').textContent = `#${t.seatNumber} (${t.seatClass === 'AC' ? 'AC' : 'Non-AC'})`;
+            document.getElementById('passFareAmount').textContent = `₹${t.fare.toFixed(2)}`;
+            document.getElementById('passInsuranceBadge').textContent = t.insured ? '✓ Travel Insurance Active' : 'No Insurance Selected';
+            document.getElementById('passInsuranceBadge').className = t.insured
+                ? 'block text-[10px] font-mono text-emerald-700 font-semibold mt-0.5'
+                : 'block text-[10px] font-mono text-slate-400 mt-0.5';
+            document.getElementById('passIssueTimestamp').textContent = `Booked: ${t.bookingTime.toLocaleTimeString()}`;
+
+            document.getElementById('boardingPassModal').classList.remove('hidden');
+        }
+
+        function closeBoardingPassModal() {
+            document.getElementById('boardingPassModal').classList.add('hidden');
+        }
+
+        function openNewBusModal() {
+            document.getElementById('newBusModal').classList.remove('hidden');
+        }
+
+        function closeNewBusModal() {
+            document.getElementById('newBusModal').classList.add('hidden');
+        }
+
+        function handleCreateBus(e) {
+            e.preventDefault();
+            const code = document.getElementById('addBusCode').value.trim();
+            const hrs = parseInt(document.getElementById('addBusHours').value, 10);
+            const src = document.getElementById('addBusSource').value.trim();
+            const dst = document.getElementById('addBusDest').value.trim();
+            const acFare = parseFloat(document.getElementById('addBusAcFare').value);
+            const nonAcFare = parseFloat(document.getElementById('addBusNonAcFare').value);
+
+            if (fleetManager.findBus(code)) {
+                notifyUser(`Coach ${code} is already registered in the fleet.`, 'error');
+                return;
+            }
+
+            const newBus = new Bus(code, src, dst, new Date(Date.now() + hrs * 3600000), 8, 12, acFare, nonAcFare);
+            fleetManager.addBus(newBus);
+            closeNewBusModal();
+            refreshUI();
+            notifyUser(`Coach ${code} (${src} → ${dst}) added to schedule.`, 'success');
+        }
+
+        function applyRouteFilter() {
+            renderBusList();
+            renderBusDeck();
+        }
+
+        function resetFilters() {
+            document.getElementById('filterSource').value = 'ALL';
+            document.getElementById('filterDestination').value = 'ALL';
+            document.getElementById('filterSeatClass').value = 'ALL';
+            cabinHighlight = 'ALL';
+            refreshUI();
+        }
+
+        function switchTab(tab) {
+            ['bus', 'passenger', 'ticket', 'fleet'].forEach(id => {
+                const view = document.getElementById(`view-${id}`);
+                const btn = document.getElementById(`nav-${id}`);
+                if (id === tab) {
+                    view.classList.remove('hidden');
+                    btn.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition bg-teal-500 text-slate-950 flex items-center gap-2';
+                } else {
+                    view.classList.add('hidden');
+                    btn.className = 'px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition flex items-center gap-2';
+                }
+            });
+            refreshUI();
+        }
+
+        function notifyUser(message, type = 'info') {
+            const area = document.getElementById('notificationArea');
+            const box = document.createElement('div');
+            const styles = {
+                success: 'bg-emerald-900 text-white border-emerald-700',
+                warning: 'bg-amber-900 text-white border-amber-700',
+                error: 'bg-rose-900 text-white border-rose-700',
+                info: 'bg-slate-900 text-white border-slate-700'
+            };
+            const icons = {
+                success: 'fa-circle-check text-emerald-400',
+                warning: 'fa-triangle-exclamation text-amber-400',
+                error: 'fa-circle-xmark text-rose-400',
+                info: 'fa-circle-info text-teal-400'
+            };
+
+            box.className = `pointer-events-auto p-3.5 rounded-xl border shadow-lg text-xs flex items-start gap-2.5 transition-all duration-300 ${styles[type]}`;
+            box.innerHTML = `
+                <i class="fa-solid ${icons[type]} text-sm mt-0.5"></i>
+                <div class="leading-relaxed">${message}</div>
+            `;
+            area.appendChild(box);
+            setTimeout(() => {
+                box.style.opacity = '0';
+                setTimeout(() => box.remove(), 300);
+            }, 4200);
+        }
+
+        window.onload = function () {
+            initializeSampleData();
+            refreshUI();
+        };
+    </script>
+</body>
+</html>
